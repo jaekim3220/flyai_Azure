@@ -11,11 +11,11 @@ import requests # get, post 둘다 통신 가능
 
 
 # 사용할 키 값
-subscription_key = 'ab082b1b37ec476fb8e315b92ed85857'
+subscription_key = '키 값 입력'
 
 
 # vision 호출 용 엔드 값
-endpoint = 'https://labuser5vision.cognitiveservices.azure.com//vision/v2.0/'
+endpoint = '엔드 값 입력'
 
 
 # 이미지 분석
