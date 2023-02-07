@@ -1,0 +1,51 @@
+# colab 2부_cloud_01.ipynb
+---
+# 이미지 분석 (웹통신에 사용하는 request)-colab 연습
+---
+- 웹 통신에서 get, post 차이
+- get은 길이 제한, 공개 (복잡하거나 민감한 정보에 사용 불가)
+- post는 데이터 통신 전 패킷 헤더의 정보가 노출되지 않도록 하는 방식
+
+
+import requests # get, post 둘다 통신 가능
+
+
+# 사용할 키 값
+subscription_key = 'ab082b1b37ec476fb8e315b92ed85857'
+
+
+# vision 호출 용 엔드 값
+endpoint = 'https://labuser5vision.cognitiveservices.azure.com//vision/v2.0/'
+
+
+# 이미지 분석
+analyze_url = endpoint + 'analyze'
+
+
+image_url = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTppPs2L4YBe6oyV4RCZBfO8Hesx1KtCqblBw&usqp=CAU'
+
+
+from PIL import Image
+from io import BytesIO
+
+
+image = Image.open(BytesIO(requests.get(image_url).content))  # binary 데이터 가져올 때는 content
+image
+
+
+# 이미지 호출
+headers = {'Ocp-Apim-Subscription-Key': subscription_key}
+params = {'visualFeatures': 'Categories,Description,Color'}
+data = {'url': image_url}
+
+
+response = requests.post(analyze_url, headers=headers, params=params, json=data)
+
+
+# json 형식으로 결과를 가져온다
+result = response.json()
+result
+
+
+# 전체 결과 중 'description'내의 'captions' 첫 번째의 'text' 만
+result['description']['captions'][0]['text']
