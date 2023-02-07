@@ -1,0 +1,58 @@
+# AZURE의 key, endpoint를 사용한 이미지 bounding box
+- computer vision
+
+# 전체 결과 중 'description'내의 'captions' 첫 번째의 'text' 만
+result['description']['captions'][0]['text']
+
+
+# 개/고양이 이미지
+image_url = 'https://image-notepet.akamaized.net/resize/620x-/seimage/20210705%2F34543d84bd467bd5560904f49289e811.jpg'
+
+
+# 원주소 + 'detect'는 object of detect가 가능
+detect_url = endpoint + 'detect'
+
+
+image = Image.open(BytesIO(requests.get(image_url).content))
+image
+
+
+# 호출 (object detection은 파라미터가 없음)
+headers = {'Ocp-Apim-Subscription-Key': subscription_key}
+data = {'url': image_url}
+
+
+# 호출결과 저장
+response = requests.post(detect_url, headers = headers, json = data) 
+
+
+result = response.json()
+result
+
+
+# 이미지를 다루기 위한 패키지를 가져온다
+from PIL import Image, ImageDraw, ImageFont # 3개의 패키지 load
+draw = ImageDraw.Draw(image) # 이미지 불러오기 (draw는 이미지가 어떤 형태로 압축되도 bit형식으로 펼친다)
+
+
+def DrawRectangle(detectResult):
+    objects = detectResult[('objects')] # object에서 objects 하위 항목을 가져온다
+    
+    for obj in objects:
+        print(obj) 
+
+        rect = obj['rectangle'] # rectangle 요소 따로
+        x = rect['x']
+        y = rect['y']
+        w = rect['w']
+        h = rect['h']
+
+        # 사각형 그리기
+        draw.rectangle(((x, y), (x+w, y+h)), outline = 'red') # tuple, set, dictionary 타입 중 tuple
+        
+        # Object name
+        objectName = obj['object']
+        draw.text((x, y), objectName, fill = 'red')
+
+
+DrawRectangle(result)
