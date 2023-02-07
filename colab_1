@@ -22,7 +22,7 @@ endpoint = '엔드 값 입력'
 analyze_url = endpoint + 'analyze'
 
 
-image_url = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTppPs2L4YBe6oyV4RCZBfO8Hesx1KtCqblBw&usqp=CAU'
+image_url = '이미지 URL'
 
 
 from PIL import Image
