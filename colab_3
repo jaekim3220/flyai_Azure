@@ -1,0 +1,81 @@
+# Azure Blob Storage
+
+
+# ! pip install azure-storage-blob azure-identity
+
+
+# AZURE 서비스 연결 작업
+import os, uuid
+from azure.identity import DefaultAzureCredential
+from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
+
+#(azure 스토리지의 엑세스 키의 연결 문자 주소)
+connet_str = 'azure 엑세스 키'
+
+blob_service_client = BlobServiceClient.from_connection_string(connet_str)
+
+
+# 컨테이너(파일을 담기 위한 폴더 단위) 생성
+container_name = str(uuid.uuid4())
+container_client = blob_service_client.create_container(container_name)
+
+print('Azure blob Storage Container Created!!!')
+
+
+# 파일 업로드 작업
+local_path = './data'
+os.mkdir(local_path)
+
+# 텍스트 문서 생성
+local_file_name = str(uuid.uuid4()) + '.txt'
+upload_file_path = os.path.join(local_path, local_file_name)
+
+# 파일 생성
+file = open(file=upload_file_path, mode = 'w')
+file.write("Hello World!")
+file.close()
+
+
+# 생성된 파일 업로드
+blob_client = blob_service_client.get_blob_client(
+    container = container_name, blob = local_file_name
+)
+
+with open(file = upload_file_path, mode = 'rb') as data:
+    blob_client.upload_blob(data)
+    
+    
+# blob의 파일 목록을 가져온다
+
+blob_list = container_client.list_blobs()
+for blob in blob_list:
+    print('\t' + blob.name)
+
+
+# blob download
+download_file_path = os.path.join(
+    local_path, str.replace(local_file_name, '.txt', 'DOWNLOAD.txt')
+)
+container_client = blob_service_client.get_container_client(
+    container = container_name
+)
+print('\nDownloading blob to \n\t' + download_file_path)
+
+with open(file = download_file_path, mode = 'wb') as download_file:
+    download_file.write(container_client.download_blob(blob.name).readall())
+    
+    
+# Clean up (blob 삭제)
+print('\nPress the Enter Key to begin clean up')
+input()
+
+print('...Deleting blob container...')
+container_client.delete_container()
+
+print('...Deleting the local source and downloaded files...')
+
+os.remove(upload_file_path)
+os.remove(download_file_path)
+os.rmdir(local_path)
+
+print('Done')
