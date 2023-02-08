@@ -1,0 +1,41 @@
+# # azure-eventhub 다운
+# !pip install azure-eventhub
+
+
+# 패키지 불러오기
+import asyncio #비동기/멀티스레드 프로그래밍
+from azure.eventhub.aio import EventHubProducerClient #데이터 생성 역할
+from azure.eventhub import EventData 
+
+
+# connection_string 기반 연결
+eventhub = EventHubProducerClient.from_connection_string('본인이 Azure 그룹에서 생성한 entity path의 주소, 이름')
+
+
+import time
+from datetime import datetime
+
+#2초 단위로 eventhub로 날리는 코드
+while(1):
+    message = '{time: \"' + str(datetime.now()) + '\"}'
+    eventhub.send_event(EventData(message))
+  
+    time.sleep(2) 
+    
+    
+# 데이터 가지고 오기 (업데이트되서 불가)
+import asyncio
+from azure.eventhub.aio import EventHubConsumerClient
+
+# 데이터 가져오는 함수
+async def on_event(partition_context, event):
+  print('Received the event: \"{}\" from the partition with ID: \"{}\"'
+  .format(event.body_as_str(encoding='UTF-8')), partition_context)
+
+  print(event)
+  await partition_context.update_checkpoint(event)
+
+client = EventHubConsumerClient.from_connection_string('본인이 Azure 그룹에서 생성한 entity path의 주소, 이름', '$Default')
+
+
+client.receive(on_event=on_event)
