@@ -1,0 +1,178 @@
+Azure 가상환경을 사용한 MLOps
+Azure Machine Learning Workspace
+
+
+#작업공간 확인 코드
+from azureml.core import Workspace # workspace 관련 패키지 가져오기
+ws = Workspace.from_config()
+print(
+    'Workspace Name' + ws.name,
+    'Azure Region : ' + ws.location,
+    'Subscription ID : ' + ws.subscription_id,
+    'Resource Group : ' + ws.resource_group, sep = '\n'
+)
+
+
+#실험공간 생성
+from azureml.core import Experiment
+
+#실험공간을 위한 작업공간 지정
+experiment = Experiment(workspace=ws, name='diabetes-experiment')
+
+
+#데이터 준비
+from azureml.opendatasets import Diabetes
+from sklearn.model_selection import train_test_split
+
+x_df = Diabetes.get_tabular_dataset().to_pandas_dataframe().dropna()
+y_df = x_df.pop('Y') 
+
+x_train, x_test, y_train, y_test = train_test_split(x_df, y_df, test_size = 0.2, random_state=66)
+print(x_train)
+
+
+#모델 훈련, 생성된 모델 업로드
+
+from sklearn.linear_model import Ridge
+from sklearn.metrics import mean_squared_error
+from sklearn.externals import joblib
+import math
+
+alphas = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+
+for alpha in alphas: #반복문을 이용한 실험 과정 기록(10번)
+    #실험 기록 시작
+    run = experiment.start_logging()
+    run.log('alpha_value', alpha)
+
+    #학습 시작
+    model = Ridge(alpha=alpha)
+    model.fit(X=x_train, y=y_train)
+
+    #테스트 시작
+    y_pred = model.predict(X=x_test)
+
+    #평가 시작
+    rmse = math.sqrt(mean_squared_error(y_true=y_test, y_pred=y_pred))
+    run.log('rmse', rmse)
+
+    #모델 데이터 저장
+    model_name = 'model_alpha_' + str(alpha) + '.pkl'
+    filename = 'outputs/' + model_name
+    joblib.dump(value=model, filename=filename)
+
+    #모델 업로드
+    run.upload_file(name=model_name, path_or_stream=filename)
+
+    #마무리
+    run.complete()
+    print(f'{alpha} Experiment completed')
+    
+    
+    #실험 객체 확인
+experiment
+# Jobs 메뉴에서 확인 가능
+
+
+# #Best Model을 탐색, 다운로드
+minimum_rmse_runid = None
+minimum_rmse = None
+
+for run in experiment.get_runs(): #반복문으로 각 실험 결과 불러오기
+    run_metrics = run.get_metrics()
+    run_detials = run.get_details()
+
+    print(run_metrics['rmse'])
+
+    run_rmse = run_metrics['rmse']
+    run_id = run_detials['runId']
+
+    if minimum_rmse is None: #처음 실행한 경우
+        minimum_rmse = run_rmse
+        minimum_rmse_runid = run_id
+    else:
+        if run_rmse < minimum_rmse:
+            minimum_rmse = run_rmse
+            minimum_rmse_runid = run_id
+
+print('Best run_id:' + minimum_rmse_runid)
+print('Best rmse:' + str(minimum_rmse))
+
+#Best model을 탐색 후 다운로드
+#동작 안 될경우 Jobs에서 rmse에 null 값이 있는 job 여부를 확인 (그래도 안 되면 오타를 의심)
+
+
+#최적의 실험 결과 불러오기
+from azureml.core import Run
+best_run = Run(experiment=experiment, run_id=minimum_rmse_runid)
+print(best_run.get_file_names())
+
+#최적의 실험 모델 다운로드
+best_run.download_file(name=best_run.get_file_names()[0])
+
+
+#DataStore에 Input/Output 데이터셋 등록
+import numpy as np
+from azureml.core import Dataset
+
+#local space에 저장
+np.savetxt('features.csv', x_train, delimiter = ',')
+np.savetxt('labels.csv', y_train, delimiter = ',')
+
+datastore = ws.get_default_datastore()
+datastore.upload_files(files=['./features.csv', 'labels.csv'],
+                                target_path='diabetes-experiment',
+                                overwrite=True) #파일 업로드
+                                
+                                
+#DataStore에서 데이터 가져오기
+feature_data = Dataset.Tabular.from_delimited_files(path=[(datastore,'diabetes-experiment/features.csv')])
+labels_data = Dataset.Tabular.from_delimited_files(path=[(datastore,'diabetes-experiment/labels.csv')])
+
+print(feature_data)
+
+
+#Best Model 등록
+import sklearn
+
+from azureml.core import Model
+from azureml.core.resource_configuration import ResourceConfiguration
+
+model = Model.register(
+            workspace=ws,
+            model_name = 'diabetes-experiment-model',
+            model_path=f'./{str(best_run.get_file_names()[0])}',
+            model_framework=Model.Framework.SCIKITLEARN,
+            model_framework_version=sklearn.__version__,
+            sample_input_dataset=feature_data,
+            sample_output_dataset=labels_data,
+            resource_configuration=ResourceConfiguration(cpu=1,memory_in_gb=0.5),
+            description='Ridge regression model',
+            tags={'area':'diabetes', 'type':'regression'}
+            )
+
+print('Name : ', model.name)
+print('Version : ', model.version)
+
+#Models 메뉴에서 확인 가능
+
+
+#서비스 생성/배포
+service_name = 'diabetes-service'
+
+#배포를 위해 workspace, 서비스네임, 배포하려는 모델 정보(다수일 경우 list 형식), 기존에 서비스가 존재 시 덮어쓰기(서비스 배포 준비)
+service = Model.deploy(ws, service_name, [model], overwrite=True) 
+service.wait_for_deployment(show_output=True) #배포 코드
+# 첫 배포일 경우 시간이 오래 걸림
+
+
+import json
+
+input_payload = json.dumps({
+            'data' : x_train[0:2].values.tolist(),
+            'method' : 'predict'
+            })
+
+output = service.run(input_payload)
+print(output)
+#Endpoints 메뉴에서 다양한 확인
