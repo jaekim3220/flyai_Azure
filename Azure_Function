@@ -1,0 +1,4 @@
+38일차_2(azure function) MicroService Architecture-클라우드 환경에서 유용하게 동작 
+(서로 다른 언어, 환경에서 작업한 결과물을 효율적으로 운용, 유지 가능) - ex) 각 부서별로 c, python, java로 생성된 결과를 각 부서가 따로 관리, 유지 할 수 있음
+
+azure function 앱 생성(HttpTriggerTest, TimerTrigger, BlobTrigger) 3가지를 사용해 azure function을 생성, 사용
