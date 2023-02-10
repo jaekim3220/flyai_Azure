@@ -1,0 +1,111 @@
+38일차_1(37일차 연장) - Azure_cmd_Linux
+
+kubectl get nodes로 Kubernetes node가 잘 살아있는지 확인
+
+az acr list --resource-group RG5 --query "[].{acrLoginServer:loginServer}" --output table
+
+ls로 리스트 확인
+
+cd azure-voting-app-redis 이동
+
+ls azure* 로 azure의 모든 파일
+
+vi azure-vote-all-in-one-redis.yaml 아래쪽으로 이동(azure-voe 이후 tab 키로 자동완성 가능)
+
+containers: 의 image: 경로 변경, i 눌러 편집 모드, front의 image: 경로를 labuser5acr.azurecr.io/azure-vote-front:v1 로 변경
+(labuser5acr.azurecr.io/azure-vote-front:v1
+labuser5acr.azurecr.io
+mcr.microsoft.com/oss/bitnami/redis:6.0.8)
+
+(
+안되면 파일 손상 ->
+cd .. -> ls -> rm -rf 삭제할 파일 -> git clone https://github.com/azure-samples/azure-voting-app-redis.git -> ls -> cd 이동할파일주소 -> vi azure-vote-all-in-one-redis.yaml
+)
+
+kubectl apply -f azure-vote-all-in-one-redis.yaml
+
+kubectl get service azure-vote-front -w 서비스 확인, ip 주소 확인 후 해당 주소로 접속
+
+kubectl get pod 아님 kubectl get pod로 서비스 확인
+
+kubectl scale --replicas=5 deployment/azure-vote-front 스케일 조정(5개)
+
+kubectl get pods -w 상태 확인
+
+az aks show --resource-group RG5 --name labuser5aks --query kubernetesVersion --output table 로 kubernetes 버전 확인
+
+cd azure- 로 전체 내용확인
+
+
+(서비스 타입이 LoadBalancer이면 자동으로 조정)
+
+kubectl autoscale deployment azure-vote-front --cpu-percent=50 --min=3 --max=10 오토스케일 기능을 명령으로생성(수요에 따라서 3~10 사이로 변화) node 갯 수만 관리하면 됨(node는 2개)
+
+확인을 위해 강제 부하 일으키기(Azure Load Testing)
+
+vi azure-vote-all-in-one-redis.yaml 열고서 autoscaling
+
+마지막에
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: azure-vote-back-hpa
+spec:
+  maxReplicas: 10 # define max replica count
+  minReplicas: 3  # define min replica count
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: azure-vote-back
+  targetCPUUtilizationPercentage: 50 # target CPU utilization
+
+---
+
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: azure-vote-front-hpa
+spec:
+  maxReplicas: 10 # define max replica count
+  minReplicas: 3  # define min replica count
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: azure-vote-front
+  targetCPUUtilizationPercentage: 50 # target CPU utilization 입력
+
+az aks scale --resource-group RG5 --name labuser5aks --node-count 3 로 node 3개 추가 
+
+kubectl get nodes 새로운 node 확인
+
+cat azure-vote/azure-vote/config_file.cfg 로 수정할 내용 확인(config 파일 내부)
+
+cat/dog의 내용을 다른걸로 바꾼다
+
+vi azure-vote/azure-vote/config_file.cfg 로 파일 들어가서 수정
+
+docker-compose up --build -d 로 바꿨으니 컨테이너 생성
+
+az acr list --resource-group RG5 --query "[].{acrLoginServer:loginServer}" --output table 로 acr에 새로운 이미지 밀어 넣기 준비 (참고로 여긴 6 - 애플리케이션 업데이트 임)
+
+docker tag mcr.microsoft.com/azuredocs/azure-vote-front:v1 labuser5acr.azurecr.io/azure-vote-front:v2 새로운 이미지 배포용 tag 걸어 놓기
+
+docker images 로 tag 확인
+
+docker push labuser5acr.azurecr.io/azure-vote-front:v2 로 tag 배포 
+
+authentication required 해결을 위해 로그인 
+-> az acr login --name labuser5acr
+
+docker push labuser5acr.azurecr.io/azure-vote-front:v2 로 한 번더 push
+
+kubectl get pods 로 잘 동작하는지 확인
+
+kubectl set image deployment azure-vote-front azure-vote-front=labuser5acr.azurecr.io/azure-vote-front:v2 업데이트(새 이미지 세팅)
+
+kubectl get pods -w 로 디테일하게 확인
+
+kubectl get service azure-vote-front 로 IP 주소 확인, 접속
+
+7- 클러스터 업그레이드는 안 함
